@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Wallpaper Engine (Plasma)
+Comment=Restore the last animated wallpaper set with the wallpaper command
+Exec=wallpaper restore
+OnlyShowIn=KDE;
+X-GNOME-Autostart-enabled=false

@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# wallpaper — switch animated Wallpaper Engine backgrounds on KDE Plasma (Wayland)
+# using linux-wallpaperengine.
+#
+#   wallpaper                list installed wallpapers
+#   wallpaper <id>           switch to wallpaper <id> (remembered for next login)
+#   wallpaper current        show the current wallpaper
+#   wallpaper stop           stop the animated wallpaper
+#   wallpaper restore        start the remembered wallpaper (used by autostart)
+#   wallpaper help           show this help
+
+set -u
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper-engine-plasma"
+CONFIG_FILE="$CONFIG_DIR/config"
+STATE_FILE="$CONFIG_DIR/current"
+
+# Defaults, overridden by the config file written by install.sh
+WPE_BIN=""
+SCREENS=""
+WORKSHOP_DIRS=""
+EXTRA_ARGS=""
+
+# shellcheck source=/dev/null
+[ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
+
+die() { echo "wallpaper: $*" >&2; exit 1; }
+
+find_bin() {
+    if [ -n "$WPE_BIN" ] && [ -x "$WPE_BIN" ]; then
+        echo "$WPE_BIN"
+    elif command -v linux-wallpaperengine >/dev/null 2>&1; then
+        command -v linux-wallpaperengine
+    else
+        die "linux-wallpaperengine not found, set WPE_BIN in $CONFIG_FILE"
+    fi
+}
+
+# Every Steam library that may hold Wallpaper Engine workshop items (app 431960)
+find_workshop_dirs() {
+    if [ -n "$WORKSHOP_DIRS" ]; then
+        echo "$WORKSHOP_DIRS" | tr ':' '\n'
+        return
+    fi
+    local roots=(
+        "$HOME/.local/share/Steam"
+        "$HOME/.steam/steam"
+        "$HOME/snap/steam/common/.local/share/Steam"
+        "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam"
+    )
+    local root vdf
+    {
+        for root in "${roots[@]}"; do
+            [ -d "$root/steamapps" ] || continue
+            echo "$root"
+            vdf="$root/steamapps/libraryfolders.vdf"
+            [ -f "$vdf" ] && sed -n 's/^[[:space:]]*"path"[[:space:]]*"\(.*\)"/\1/p' "$vdf"
+        done
+    } | while read -r root; do
+        [ -d "$root/steamapps/workshop/content/431960" ] && realpath "$root/steamapps/workshop/content/431960"
+    done | sort -u
+}
+
+find_screens() {
+    if [ -n "$SCREENS" ]; then
+        echo "$SCREENS"
+    elif command -v kscreen-doctor >/dev/null 2>&1; then
+        kscreen-doctor -o 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' \
+            | awk '/^Output:/ { name = $3 } /^[[:space:]]+enabled$/ { print name }' | tr '\n' ' '
+    fi
+}
+
+wallpaper_dir() {
+    local dir
+    while read -r dir; do
+        [ -d "$dir/$1" ] && { echo "$dir/$1"; return 0; }
+    done < <(find_workshop_dirs)
+    return 1
+}
+
+list_wallpapers() {
+    local dirs=()
+    mapfile -t dirs < <(find_workshop_dirs)
+    [ ${#dirs[@]} -gt 0 ] || die "no Wallpaper Engine workshop folder found, set WORKSHOP_DIRS in $CONFIG_FILE"
+
+    python3 -I - "${dirs[@]}" <<'PY'
+import json, os, sys
+
+for root in sys.argv[1:]:
+    for item in sorted(os.listdir(root)):
+        try:
+            with open(os.path.join(root, item, "project.json"), encoding="utf-8") as f:
+                project = json.load(f)
+        except (OSError, ValueError):
+            continue
+        kind = str(project.get("type", "?")).lower()
+        print("%-12s %-6s %s" % (item, kind, project.get("title", "?")))
+PY
+}
+
+stop_wallpaper() {
+    # the kernel truncates process names to 15 characters
+    pkill -x linux-wallpaper 2>/dev/null
+    return 0
+}
+
+start_wallpaper() {
+    local id="$1" bin screens args=() screen
+    bin="$(find_bin)"
+    screens="$(find_screens)"
+    [ -n "$screens" ] || die "no screens found, set SCREENS in $CONFIG_FILE"
+
+    for screen in $screens; do
+        args+=(--screen-root "$screen")
+    done
+    # shellcheck disable=SC2206
+    args+=(--bg "$id" $EXTRA_ARGS)
+
+    # linux-wallpaperengine expects to run from its own folder (CEF resources live there)
+    (cd "$(dirname "$bin")" && setsid nohup "$bin" "${args[@]}" >/dev/null 2>&1 &)
+}
+
+cmd="${1:-list}"
+case "$cmd" in
+    list|ls)
+        list_wallpapers
+        ;;
+    current)
+        [ -f "$STATE_FILE" ] && cat "$STATE_FILE" || echo "none"
+        ;;
+    stop)
+        stop_wallpaper
+        rm -f "$STATE_FILE"
+        echo "Wallpaper stopped"
+        ;;
+    restore)
+        [ -f "$STATE_FILE" ] || exit 0
+        stop_wallpaper
+        start_wallpaper "$(cat "$STATE_FILE")"
+        ;;
+    help|-h|--help)
+        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+        ;;
+    *)
+        [[ "$cmd" =~ ^[0-9]+$ ]] || die "unknown command '$cmd' (see 'wallpaper help')"
+        wallpaper_dir "$cmd" >/dev/null || die "no wallpaper with id $cmd (run 'wallpaper' to list)"
+        stop_wallpaper
+        mkdir -p "$CONFIG_DIR"
+        echo "$cmd" > "$STATE_FILE"
+        start_wallpaper "$cmd"
+        echo "Wallpaper set to $cmd"
+        ;;
+esac

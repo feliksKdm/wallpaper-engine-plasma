@@ -1,0 +1,16 @@
+# Config for the `wallpaper` command.
+# Installed to ~/.config/wallpaper-engine-plasma/config
+
+# Path to the linux-wallpaperengine binary (inside its build/output folder)
+WPE_BIN=""
+
+# Screens to draw on, separated by spaces (e.g. "eDP-1 HDMI-A-1").
+# Empty = every enabled screen reported by kscreen-doctor.
+SCREENS=""
+
+# Wallpaper Engine workshop folders (steamapps/workshop/content/431960), separated by ':'.
+# Empty = auto-detect native, Snap and Flatpak Steam libraries.
+WORKSHOP_DIRS=""
+
+# Extra flags passed to linux-wallpaperengine, e.g. "--fps 24 --silent"
+EXTRA_ARGS=""
