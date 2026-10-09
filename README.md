@@ -2,10 +2,13 @@
 
 A small helper for running [linux-wallpaperengine](https://github.com/Almamu/linux-wallpaperengine)
 as your animated desktop background on **KDE Plasma (Wayland)**, with a simple `wallpaper` command
-to switch between your Steam Workshop wallpapers.
+to switch between your Steam Workshop wallpapers, with image previews right in the terminal.
+
+Run `wallpaper` to get a searchable list with a live preview of each wallpaper; press Enter to apply it.
+Or use it from scripts:
 
 ```console
-$ wallpaper
+$ wallpaper list
 1102620285   scene  Kyogre (Pokemon)
 2225690388   video  Connector Yumi - Dream ver
 3244466773   scene  Gengar | Full HD (1920x1080)
@@ -27,6 +30,7 @@ KDE Plasma supports `wlr-layer-shell`, so the wallpaper works out of the box.
 - [linux-wallpaperengine](https://github.com/Almamu/linux-wallpaperengine) built from source
 - Wallpaper Engine owned and installed through Steam, with some Workshop wallpapers subscribed
 - `python3` and `kscreen-doctor` (part of Plasma)
+- Optional, for previews: `fzf` and `chafa` (`sudo apt install fzf chafa`)
 
 ## Install
 
@@ -48,8 +52,10 @@ The installer:
 
 | Command | What it does |
 |---|---|
-| `wallpaper` | List installed wallpapers (ID, type, title) |
+| `wallpaper` | Interactive picker with previews (falls back to `list` without `fzf`/`chafa`) |
+| `wallpaper list` | List installed wallpapers (ID, type, title) |
 | `wallpaper <id>` | Switch to wallpaper `<id>`, remembered for the next login |
+| `wallpaper preview <id>` | Show the preview image of wallpaper `<id>` |
 | `wallpaper current` | Show the current wallpaper ID |
 | `wallpaper stop` | Stop the animated wallpaper |
 | `wallpaper restore` | Start the remembered wallpaper (used by autostart) |
@@ -67,8 +73,12 @@ Edit `~/.config/wallpaper-engine-plasma/config`:
 | `SCREENS` | all enabled screens | Screens to draw on, e.g. `"eDP-1 HDMI-A-1"` |
 | `WORKSHOP_DIRS` | auto-detected | Workshop folders (`.../workshop/content/431960`), `:`-separated |
 | `EXTRA_ARGS` | empty | Extra flags, e.g. `"--fps 24 --silent"` to save battery |
+| `PREVIEW_FORMAT` | guessed | Image protocol for previews: `sixels`, `kitty`, `iterm` or `symbols` |
 
 Native, Snap and Flatpak Steam installs (and extra Steam library folders) are detected automatically.
+
+Previews use real images in Konsole, kitty, WezTerm, foot and Ghostty. In other terminals they fall back
+to colored text blocks; set `PREVIEW_FORMAT` if your terminal supports sixels or the kitty protocol.
 
 ## Uninstall
 
@@ -86,7 +96,9 @@ This removes the command, its config and the autostart entry. linux-wallpapereng
 
 ```bash
 ./install.sh --bin ~/путь/к/linux-wallpaperengine/build/output/linux-wallpaperengine
-wallpaper              # список обоев
+sudo apt install fzf chafa   # для превью картинок в терминале
+wallpaper              # выбрать обои с превью (Enter — поставить)
+wallpaper list         # просто список
 wallpaper <id>         # поставить обои
 wallpaper stop         # выключить
 ```

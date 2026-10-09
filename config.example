@@ -14,3 +14,7 @@ WORKSHOP_DIRS=""
 
 # Extra flags passed to linux-wallpaperengine, e.g. "--fps 24 --silent"
 EXTRA_ARGS=""
+
+# Image protocol for previews: sixels, kitty, iterm or symbols.
+# Empty = guess from the terminal (Konsole uses sixels).
+PREVIEW_FORMAT=""

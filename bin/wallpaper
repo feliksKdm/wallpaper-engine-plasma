@@ -2,8 +2,11 @@
 # wallpaper — switch animated Wallpaper Engine backgrounds on KDE Plasma (Wayland)
 # using linux-wallpaperengine.
 #
-#   wallpaper                list installed wallpapers
+#   wallpaper                pick a wallpaper with live previews (needs fzf + chafa),
+#                            otherwise the same as 'wallpaper list'
+#   wallpaper list           list installed wallpapers
 #   wallpaper <id>           switch to wallpaper <id> (remembered for next login)
+#   wallpaper preview <id>   show the preview image of wallpaper <id> (needs chafa)
 #   wallpaper current        show the current wallpaper
 #   wallpaper stop           stop the animated wallpaper
 #   wallpaper restore        start the remembered wallpaper (used by autostart)
@@ -20,6 +23,7 @@ WPE_BIN=""
 SCREENS=""
 WORKSHOP_DIRS=""
 EXTRA_ARGS=""
+PREVIEW_FORMAT=""
 
 # shellcheck source=/dev/null
 [ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
@@ -98,6 +102,74 @@ for root in sys.argv[1:]:
 PY
 }
 
+preview_file() {
+    local dir
+    dir="$(wallpaper_dir "$1")" || return 1
+    python3 -I - "$dir" <<'PY'
+import glob, json, os, sys
+
+root = sys.argv[1]
+try:
+    with open(os.path.join(root, "project.json"), encoding="utf-8") as f:
+        name = json.load(f).get("preview") or ""
+except (OSError, ValueError):
+    name = ""
+candidates = [os.path.join(root, name)] if name else []
+candidates += sorted(glob.glob(os.path.join(root, "preview.*")))
+for path in candidates:
+    if os.path.isfile(path):
+        print(path)
+        break
+PY
+}
+
+# chafa can't detect the terminal from inside fzf's preview pane (stdout is not a tty there),
+# so pick the graphics protocol up front from the environment
+preview_format() {
+    if [ -n "$PREVIEW_FORMAT" ]; then
+        echo "$PREVIEW_FORMAT"
+    elif [ -n "${KITTY_WINDOW_ID:-}" ] || [[ "${TERM:-}" == *kitty* ]] || [ -n "${GHOSTTY_RESOURCES_DIR:-}" ]; then
+        echo kitty
+    elif [ -n "${KONSOLE_VERSION:-}" ] || [ -n "${WEZTERM_EXECUTABLE:-}" ] || [[ "${TERM:-}" == foot* ]]; then
+        echo sixels
+    else
+        echo symbols
+    fi
+}
+
+show_preview() {
+    local id="$1" size="${2:-}" file
+    command -v chafa >/dev/null 2>&1 || die "chafa is not installed (sudo apt install chafa)"
+    file="$(preview_file "$id")"
+    [ -n "$file" ] || { echo "No preview for $id"; return 0; }
+    # previews are often GIFs: show the first frame instead of animating forever
+    chafa --animate off -f "${WALLPAPER_PREVIEW_FORMAT:-$(preview_format)}" ${size:+-s "$size"} "$file"
+}
+
+pick_wallpaper() {
+    local current selected
+    current="$(cat "$STATE_FILE" 2>/dev/null)"
+    export WALLPAPER_PREVIEW_FORMAT
+    WALLPAPER_PREVIEW_FORMAT="$(preview_format)"
+
+    selected="$(list_wallpapers | fzf \
+        --prompt 'wallpaper> ' \
+        --header "Enter: set wallpaper   Esc: cancel   current: ${current:-none}" \
+        --preview "'$0' preview {1} \"\${FZF_PREVIEW_COLUMNS}x\${FZF_PREVIEW_LINES}\"" \
+        --preview-window 'right,55%,border-left')" || return 0
+
+    set_wallpaper "${selected%% *}"
+}
+
+set_wallpaper() {
+    wallpaper_dir "$1" >/dev/null || die "no wallpaper with id $1 (run 'wallpaper list' to list)"
+    stop_wallpaper
+    mkdir -p "$CONFIG_DIR"
+    echo "$1" > "$STATE_FILE"
+    start_wallpaper "$1"
+    echo "Wallpaper set to $1"
+}
+
 stop_wallpaper() {
     # the kernel truncates process names to 15 characters
     pkill -x linux-wallpaper 2>/dev/null
@@ -120,10 +192,22 @@ start_wallpaper() {
     (cd "$(dirname "$bin")" && setsid nohup "$bin" "${args[@]}" >/dev/null 2>&1 &)
 }
 
-cmd="${1:-list}"
+cmd="${1:-}"
 case "$cmd" in
+    "")
+        if [ -t 0 ] && [ -t 1 ] && command -v fzf >/dev/null 2>&1 && command -v chafa >/dev/null 2>&1; then
+            pick_wallpaper
+        else
+            list_wallpapers
+        fi
+        ;;
     list|ls)
         list_wallpapers
+        ;;
+    preview)
+        [ -n "${2:-}" ] || die "usage: wallpaper preview <id>"
+        wallpaper_dir "$2" >/dev/null || die "no wallpaper with id $2 (run 'wallpaper list' to list)"
+        show_preview "$2" "${3:-}"
         ;;
     current)
         [ -f "$STATE_FILE" ] && cat "$STATE_FILE" || echo "none"
@@ -139,15 +223,10 @@ case "$cmd" in
         start_wallpaper "$(cat "$STATE_FILE")"
         ;;
     help|-h|--help)
-        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
         ;;
     *)
         [[ "$cmd" =~ ^[0-9]+$ ]] || die "unknown command '$cmd' (see 'wallpaper help')"
-        wallpaper_dir "$cmd" >/dev/null || die "no wallpaper with id $cmd (run 'wallpaper' to list)"
-        stop_wallpaper
-        mkdir -p "$CONFIG_DIR"
-        echo "$cmd" > "$STATE_FILE"
-        start_wallpaper "$cmd"
-        echo "Wallpaper set to $cmd"
+        set_wallpaper "$cmd"
         ;;
 esac
