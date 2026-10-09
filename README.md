@@ -72,6 +72,9 @@ Edit `~/.config/wallpaper-engine-plasma/config`:
 | `WPE_BIN` | set by installer | Path to the `linux-wallpaperengine` binary |
 | `SCREENS` | all enabled screens | Screens to draw on, e.g. `"eDP-1 HDMI-A-1"` |
 | `WORKSHOP_DIRS` | auto-detected | Workshop folders (`.../workshop/content/431960`), `:`-separated |
+| `SCALING` | `fill` | `fill` covers the screen (crops the edges); `fit` shows the whole image, which can leave smeared bars |
+| `MOUSE` | `off` | `on` lets wallpapers react to the mouse, but they then capture the cursor and desktop clicks |
+| `LAYER` | `bottom` | Wayland layer for the wallpaper: `bottom` or `background` |
 | `EXTRA_ARGS` | empty | Extra flags, e.g. `"--fps 24 --silent"` to save battery |
 | `PREVIEW_FORMAT` | guessed | Image protocol for previews: `sixels`, `kitty`, `iterm` or `symbols` |
 

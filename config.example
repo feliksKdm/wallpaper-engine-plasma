@@ -12,6 +12,17 @@ SCREENS=""
 # Empty = auto-detect native, Snap and Flatpak Steam libraries.
 WORKSHOP_DIRS=""
 
+# How the wallpaper fits the screen: fill (cover the screen, crop the edges),
+# fit (show it whole, may leave smeared bars), stretch or default.
+SCALING="fill"
+
+# on  = the wallpaper reacts to the mouse, but takes over the cursor and desktop clicks
+# off = clicks, right-click menu, selection and the cursor go to the Plasma desktop
+MOUSE="off"
+
+# Wayland layer: bottom (default) or background
+LAYER=""
+
 # Extra flags passed to linux-wallpaperengine, e.g. "--fps 24 --silent"
 EXTRA_ARGS=""
 

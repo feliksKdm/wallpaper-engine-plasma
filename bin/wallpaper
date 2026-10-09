@@ -24,6 +24,9 @@ SCREENS=""
 WORKSHOP_DIRS=""
 EXTRA_ARGS=""
 PREVIEW_FORMAT=""
+SCALING="fill"
+MOUSE="off"
+LAYER=""
 
 # shellcheck source=/dev/null
 [ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
@@ -183,8 +186,13 @@ start_wallpaper() {
     [ -n "$screens" ] || die "no screens found, set SCREENS in $CONFIG_FILE"
 
     for screen in $screens; do
-        args+=(--screen-root "$screen")
+        # --scaling applies to the --screen-root right before it
+        args+=(--screen-root "$screen" ${SCALING:+--scaling "$SCALING"})
     done
+    # with mouse input off the wallpaper doesn't grab the pointer, so clicks,
+    # the cursor shape and selection go to the Plasma desktop underneath
+    [ "$MOUSE" = "on" ] || args+=(--disable-mouse)
+    [ -n "$LAYER" ] && args+=(--layer "$LAYER")
     # shellcheck disable=SC2206
     args+=(--bg "$id" $EXTRA_ARGS)
 
